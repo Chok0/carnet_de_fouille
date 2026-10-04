@@ -1,0 +1,74 @@
+name: Build, tests & GitHub Pages
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build + tests de fumée
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tests/requirements.txt
+
+      - name: Dépendances de test
+        run: |
+          pip install -r tests/requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Build depuis le zip des sources
+        run: python ci/build.py --check
+
+      - name: three.js r128 en local (tests indépendants du CDN)
+        run: |
+          npm pack three@0.128.0 --silent
+          tar xzf three-0.128.0.tgz package/build/three.min.js
+          echo "THREE_JS=$PWD/package/build/three.min.js" >> "$GITHUB_ENV"
+
+      - name: Tests de fumée (Chromium, mobile + desktop)
+        run: python -m pytest tests -v
+
+      - name: Captures d'écran
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: captures
+          path: shots/
+          if-no-files-found: ignore
+
+      - name: Préparer le site
+        run: |
+          mkdir site
+          cp dist/preview.html site/index.html
+          cp dist/preview-debug.html site/debug.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: Publication GitHub Pages
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
