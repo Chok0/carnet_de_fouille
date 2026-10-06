@@ -18,6 +18,9 @@
 [hidden]{display:none!important}
 html,body{height:100%}
 body{background:var(--desk);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+/* Safari iOS : un doigt maintenu (frapper, la loupe, la pelle) ne doit ni sélectionner le texte ni ouvrir le menu ou la loupe du système */
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
 button{font:inherit;color:inherit}
 .ic{width:1.25em;height:1.25em;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:middle}
 .ic .f{fill:currentColor}
@@ -1387,6 +1390,8 @@ const GEODES = {
 const DESTS = {
   tiers: [{ name: 'Gisement modeste', poches: 2 }, { name: 'Gisement prometteur', poches: 3 }, { name: 'Gisement riche', poches: 4 }],
   base: 20, perPoche: 35, uni: 70, perNew: 6, perNum: 5, perGeode: 12, perVein: 4,
+  /* pas de géode avant ce gisement : le geste dosé s'apprend une fois l'écoute acquise */
+  geodeFrom: 3,
   profils: { fossiles: { name: 'riche en fossiles', veins: 4, geodes: 1 }, mineral: { name: 'très minéral', veins: 9, geodes: 1 }, gemmes: { name: 'riche en géodes', veins: 5, geodes: 4 }, mixte: { name: 'un peu de tout', veins: 6, geodes: 2 } }
 };
 const TABS = [['outils', 'Outils'], ['indices', 'Indices']];
@@ -1457,7 +1462,7 @@ const TITLE_TXT = {
   page: 'Carnet de fouille', pageSub: 'Assistant de terrain du professeur Kayou',
   save: '{n} espèce{s} au musée · gisement n°{g}'
 };
-/* tutoriel à l'établi du professeur : trois pierres, un geste chacune */
+/* tutoriel à l'établi du professeur : deux pierres, un geste chacune (la géode s'apprend sur le terrain) */
 const TUTO_TXT = {
   skip: 'Passer', skipSure: 'Passer le tutoriel ?', next: 'Pierre suivante', go: 'En route !',
   tak: 'Tak : là, c’est la pierre pleine, hors des fils. Visez la ligne dorée.',
@@ -1477,7 +1482,7 @@ const TUTO_TXT = {
   },
   veine: {
     rock: 'roche massive : des joints, pas de feuillets',
-    listen: 'Une quartzite : pas de feuillets, seulement des joints, ces lignes en biais. Tapotez les fils dorés et écoutez : l’un d’eux cache une veine.',
+    listen: 'Une quartzite : pas de feuillets, seulement des joints, ces lignes en biais. Glissez le doigt pour la tourner, puis touchez les fils dorés, sans appuyer, et écoutez : l’un d’eux cache une veine.',
     pic: 'Pic : un son plein, ce fil est vide. Essayez l’autre.',
     strike: 'Ting ! Une veine de minerai. Plus le ting sonne clair, plus vous êtes près du cœur : maintenez le doigt sur la grosse marque, puis lâchez.',
     closer: 'Plus près de la grosse marque : le ting y est plus clair.', wrong: 'Pas ce fil-là : il sonne pic, il est vide.', off: 'Hors du fil : visez la ligne.',
@@ -1491,7 +1496,7 @@ const TUTO_TXT = {
     follow: 'Pok ! Un os, tout près. Tapotez le long des marques : le pok grossit à mesure que vous approchez du cœur.',
     strike: 'Le gros POK : c’est ici ! Maintenez le doigt dessus, puis lâchez pour frapper.',
     closer: 'Un peu plus près du gros POK, sur la grosse marque.', wrong: 'Pas ce fil-là : lui sonne pic.', off: 'Hors du fil : visez la ligne.',
-    done: 'Un trilobite ! Vous avez l’oreille. Pic : rien. Pok : un os, et plus il est gros, plus vous êtes près. Ting : du minerai. Bong : une géode. Sur le terrain, chaque tapotement fatigue la pierre : écoutez, puis décidez-vous.',
+    done: 'Un trilobite ! Vous avez l’oreille. Pic : rien. Pok : un os, et plus il est gros, plus vous êtes près. Ting : du minerai. Sur le terrain, chaque tapotement fatigue la pierre : écoutez, puis décidez-vous.',
     title: 'Trilobite', sub: '★★★ · frappé au gros POK : l’os sort intact.'
   }
 };
@@ -1507,7 +1512,7 @@ const ARRIVEE = {
   relief: { riviere: 'Un lit de rivière : les crues ont dégagé bien des roches pour nous.', falaise: 'Au pied de la falaise, les éboulis cachent parfois des merveilles.', carriere: 'Une ancienne carrière : les carriers n’ont sûrement pas tout emporté.' },
   roche: 'Cherchez {propices} : quelque part dedans, des squelettes dorment, chacun dans sa poche.',
   avance: 'Le musée a avancé les frais du voyage. Il va falloir remplir les caisses !',
-  equipe: 'Ne cherchez pas que les os : une veine bien ouverte, une géode, et voilà de quoi payer un meilleur marteau ou une pelle plus solide. Avec de bons outils, les fossiles viendront plus vite.',
+  equipe: 'Ne cherchez pas que les os : une veine bien ouverte, un doublon, et voilà de quoi payer un meilleur marteau ou une pelle plus solide. Avec de bons outils, les fossiles viendront plus vite.',
   reserve: 'Nos spécimens inachevés sont rangés en réserve. Ici, chaque squelette est à reprendre de zéro.'
 };
 /* après une longue série de pierres sans fossile */
@@ -7648,6 +7653,8 @@ const Bench3D = (function () {
     };
     cv.addEventListener('pointerup', end);
     cv.addEventListener('pointercancel', () => { down = null; ring.style.opacity = 0; lensEl.style.display = 'none'; });
+    /* un appui long (frapper) n'ouvre pas le menu contextuel du système */
+    cv.addEventListener('contextmenu', e => e.preventDefault());
   }
   function rotateBy(dx, dy) {
     const THREE = T3();
@@ -8133,12 +8140,13 @@ const Bench3D = (function () {
 })();
 
 /* ---------- tutoriel : l'établi du professeur ----------
-   Trois pierres, un geste chacune : la géode (bong, puis un coup dosé), la veine (ting), l'os (pic, pok, gros POK).
+   Deux pierres, un geste chacune : la veine (ting), l'os (pic, pok, gros POK).
+   La géode (bong, puis un coup dosé) n'est pas au tutoriel : geste plus technique, elle s'apprend sur le terrain,
+   à partir du gisement DESTS.geodeFrom, quand Kayou l'explique au premier bong.
    Chaque étape attend le geste : le fil à écouter s'éclaire, des marques mènent au cœur.
    Pas de fatigue, pas d'échec : un coup mal placé est refusé et Kayou corrige ; le résultat est garanti. */
 let TUTO = null;
 const TUTO_STONES = [
-  { id: 'geode', seed: 7301, rock: null, contents: [{ type: 'geode', gem: 'quartz', joint: true }] },
   { id: 'veine', seed: 4129, rock: 'quartzite', contents: [{ type: 'rien', joint: true }, { type: 'veine', joint: true, ore: 'cuivre' }] },
   { id: 'os', seed: 5813, rock: 'schiste', fat: true, contents: [{ type: 'rien' }, { type: 'os', fid: 'trilobite' }] }
 ];
@@ -8182,7 +8190,7 @@ function tutoLoad(i) {
   setFatigue(0, 0);
   $('rockLabel').innerHTML = R ? '<img src="' + rockSwatch(T.rock, 48) + '" alt=""><div><b>' + R.name + '</b><span>' + TUTO_TXT[T.id].rock + '</span></div>'
     : '<div><b>Nodule</b><span>' + TUTO_TXT.geode.rock + '</span></div>';
-  TUTO.el.querySelector('.tc-step').textContent = ' · pierre ' + (i + 1) + ' sur 3';
+  TUTO.el.querySelector('.tc-step').textContent = ' · pierre ' + (i + 1) + ' sur ' + TUTO_STONES.length;
   tutoStep(T.id === 'os' ? 'pic' : 'listen');
 }
 /* une étape : ce que dit le professeur, ce qui s'éclaire */
@@ -8310,7 +8318,7 @@ function tutoFinish() {
   $('btnBack').innerHTML = t.back;
   t.el.remove(); $('scr-etabli').classList.remove('tuto', 'tuto-fat'); $('app').classList.remove('in-tuto');
   Ambient.setMode('calme');
-  G.notes.tutoEtabli = 1; G.notes.pierre = 1; G.notes.geode = 1; G.notes.ting = 1; save();
+  G.notes.tutoEtabli = 1; G.notes.pierre = 1; G.notes.ting = 1; save();
   if (t.then) t.then(); else show(G.stone ? 'etabli' : 'carte');
 }
 
@@ -8912,7 +8920,7 @@ function siteV5(S) {
   if (S.uni != null && !S.uniXY) S.uniXY = at(S.uni, 0.4);
   /* les géodes dorment loin des poches, dans la roche pauvre ou massive : elles rendent ces zones intéressantes */
   if (!S.geodes) {
-    const want = S.want && S.want.geodes != null ? S.want.geodes : 2 + Math.floor(rng() * 2), far = SITE.zones.filter(z => z.band !== 'propice');
+    const want = (S.num || 1) < DESTS.geodeFrom ? 0 : S.want && S.want.geodes != null ? S.want.geodes : 2 + Math.floor(rng() * 2), far = SITE.zones.filter(z => z.band !== 'propice');
     const pool = far.length ? far : SITE.zones, ids = Object.keys(GEODES);
     S.geodes = [];
     for (let i = 0; i < want; i++) {
@@ -9417,6 +9425,9 @@ function gainFragment(p, z, stars, fresh) {
   const block = miss[Math.floor(Math.random() * miss.length)], before = I.found.slice(), beforeQ = Object.assign({}, I.q);
   I.found.push(block); I.q[block] = stars; G.site.stats.frags++;
   L.frags[fid] = (L.frags[fid] || 0) + 1;
+  /* chaque bloc dégagé est payé tout de suite (selon la rareté et sa conservation) : chercher des os fait avancer le musée */
+  const gain = Math.round(RARITY[F.rarity].bloc * stars / 3);
+  if (gain) { addMoney(gain); G.site.stats.prime = (G.site.stats.prime || 0) + gain; L.gain += gain; }
   let bonus = 0, done = false, mean = 0;
   if (I.found.length >= n) {
     /* identification : la prime suit la conservation moyenne du squelette */
@@ -9426,7 +9437,7 @@ function gainFragment(p, z, stars, fresh) {
     bonus = Math.round(RARITY[F.rarity].bonus * (0.5 + 0.25 * mean)); addMoney(bonus); G.site.stats.bonus += bonus; G.site.stats.completes++;
     L.ident.push(fid); L.bonus += bonus; L.gain += bonus;
   }
-  return { t: 'fragment', fid, block, before, beforeQ, stars, done, bonus, mean, n: I.found.length, of: n, k: I.k, fresh: first && st.ind.length > 1, first };
+  return { t: 'fragment', fid, block, before, beforeQ, stars, done, gain, bonus, mean, n: I.found.length, of: n, k: I.k, fresh: first && st.ind.length > 1, first };
 }
 /* os d'une espèce déjà au musée : s'il est mieux conservé que le nôtre, il le remplace ; l'autre est revendu */
 function gainKnown(p, stars) {
@@ -9665,9 +9676,12 @@ function reveal(o) {
     syncMoney(false);
   } else if (tier === 2) {
     title = (main.fresh ? 'Nouveau spécimen · ' : 'Fragment · ') + dispName(main.fid); sub = STARS(main.stars) + (main.pieces > 1 ? ' · ' + main.pieces + ' blocs d’un coup · ' + res.filter(r => r.t === 'fragment').pop().n + ' sur ' + main.of : ' · bloc ' + main.n + ' sur ' + main.of) + (fos(main.fid).ind.length > 1 ? ' · individu n°' + main.k : '');
+    const fragCoins = res.filter(r => r.t === 'fragment').reduce((a, r) => a + (r.gain || 0), 0);
+    if (fragCoins) sub += ' · +' + fragCoins;
     if (dupCoins) sub += ' · doublon +' + dupCoins;
+    if (fragCoins + dupCoins) coinFloat(fragCoins + dupCoins);
     if (main.lost) sub += ' · ' + main.lost.join(', ');
-  } else if (tier === 3) { title = FOSSILS[main.fid].name + ' identifié'; sub = 'Conservation ' + String(Math.round(main.mean * 10) / 10).replace('.', ',') + ' / 3 · +' + main.bonus; }
+  } else if (tier === 3) { title = FOSSILS[main.fid].name + ' identifié'; sub = 'Conservation ' + String(Math.round(main.mean * 10) / 10).replace('.', ',') + ' / 3 · +' + (main.bonus + res.filter(r => r.t === 'fragment').reduce((a, r) => a + (r.gain || 0), 0)); }
   const col = res.find(r => r.t === 'colonne');
   if (col) sub += ' · Colonne ' + EPOCHS[col.ep].name + ' complète : +' + col.bonus;
   const pc = main.pieces > 1 ? main.pieces : 0;
@@ -10102,9 +10116,9 @@ function makeOffers(num) {
     const ep = eps[i], uni = false;
     const fresh = EPOCHS[ep].fossils.filter(f => !fos(f).done).length;
     const price = Math.round((DESTS.base + DESTS.perPoche * (T.poches - 2) + DESTS.perNew * fresh + DESTS.perNum * Math.max(0, num - 2)) / 5) * 5;
-    const pk = Object.keys(DESTS.profils), prof = pk[Math.floor(Math.random() * pk.length)], P = DESTS.profils[prof];
-    const price2 = Math.round((price + DESTS.perGeode * P.geodes + DESTS.perVein * (P.veins - 5)) / 5) * 5;
-    return { tier: i, name: T.name, epoch: ep, poches: T.poches, uni, fresh, prof, veins: P.veins, geodes: P.geodes, price: Math.max(15, price2) };
+    const early = num < DESTS.geodeFrom, pk = Object.keys(DESTS.profils).filter(k => !early || k !== 'gemmes'), prof = pk[Math.floor(Math.random() * pk.length)], P = DESTS.profils[prof], geodes = early ? 0 : P.geodes;
+    const price2 = Math.round((price + DESTS.perGeode * geodes + DESTS.perVein * (P.veins - 5)) / 5) * 5;
+    return { tier: i, name: T.name, epoch: ep, poches: T.poches, uni, fresh, prof, veins: P.veins, geodes, price: Math.max(15, price2) };
   });
 }
 function startVoyage() {
@@ -10419,7 +10433,7 @@ function openSheet(inner, onMount) {
 function openLeave() {
   const S = G.site, s = S.stats, open = openInds(), stones = S.holes.filter(h => h.k === 'pierre').length;
   const inner = '<h2>Bilan du gisement n°' + S.num + '</h2><p>On ne revient jamais sur un gisement quitté.</p>' +
-    '<table class="bilan"><tr><td>Fouilles</td><td>' + S.holes.length + '</td></tr><tr><td>Pierres fendues</td><td>' + stones + '</td></tr><tr><td>Minerai vendu</td><td>+' + s.ore + '</td></tr><tr><td>Primes de fossiles</td><td>+' + s.bonus + '</td></tr><tr><td>Fragments trouvés</td><td>' + s.frags + '</td></tr>' + (s.dup ? '<tr><td>Doublons revendus</td><td>' + s.dup + '</td></tr>' : '') + '<tr><td>Pièces uniques</td><td>' + s.uniques + '</td></tr><tr><td>Fossiles complétés</td><td>' + s.completes + '</td></tr></table>' +
+    '<table class="bilan"><tr><td>Fouilles</td><td>' + S.holes.length + '</td></tr><tr><td>Pierres fendues</td><td>' + stones + '</td></tr><tr><td>Minerai vendu</td><td>+' + s.ore + '</td></tr>' + (s.prime ? '<tr><td>Fragments payés</td><td>+' + s.prime + '</td></tr>' : '') + '<tr><td>Primes de fossiles</td><td>+' + s.bonus + '</td></tr><tr><td>Fragments trouvés</td><td>' + s.frags + '</td></tr>' + (s.dup ? '<tr><td>Doublons revendus</td><td>' + s.dup + '</td></tr>' : '') + '<tr><td>Pièces uniques</td><td>' + s.uniques + '</td></tr><tr><td>Fossiles complétés</td><td>' + s.completes + '</td></tr></table>' +
     (open.length ? '<div class="trip warn">' + ic('puzzle') + '<div><b>' + open.length + ' squelette' + (open.length > 1 ? 's' : '') + ' inachevé' + (open.length > 1 ? 's' : '') + '</b><span>' + open.map(o => dispName(o.fid) + ' ' + o.I.found.length + '/' + FOSSILS[o.fid].blocks).join(', ') + '. Ils partent en réserve, incomplets.</span></div></div>' : '') +
     '<div class="trip">' + ic('museum') + '<div><b>Escale au musée</b><span>La boutique y est ouverte, puis vous choisirez la prochaine destination.</span></div></div>' +
     '<div class="actions"><button class="btn" data-close>Revoir la carte</button><button class="btn primary" id="goLeave">' + ic('museum') + 'Rentrer au musée</button></div>';
